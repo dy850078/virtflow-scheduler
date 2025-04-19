@@ -1,7 +1,7 @@
 from app.core.config import logger 
 from app.models.schemas import BareMetalNode, SchedulingRequest
 
-
+# Filter nodes based on pool, dedicated status, and current VM count
 def pre_filter(request: SchedulingRequest, nodes: list[BareMetalNode]):
     return [
         node for node in nodes
