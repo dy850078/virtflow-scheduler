@@ -1,24 +1,11 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+# Mock data for BareMetalNode
 from typing import List
+
+from fastapi import FastAPI
+from app.models.schemas import BareMetalNode
 
 app = FastAPI()
 
-# Definition of BareMetalNode
-class BareMetalNode(BaseModel):
-    name: str
-    cpu: int
-    memory: int
-    storage: int
-    usage_cpu: float
-    usage_mem: float
-    pool: str
-    dedicated: bool
-    model: str
-    max_vms: int
-    current_vms: int
-
-# Mock data for BareMetalNode
 mock_nodes = [
     BareMetalNode(
         name="bm01",
@@ -47,6 +34,7 @@ mock_nodes = [
         current_vms=10
     )
 ]
+
 
 # Mock API endpoint to get BareMetalNode
 @app.get("/nodes", response_model=List[BareMetalNode])
