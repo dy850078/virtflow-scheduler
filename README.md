@@ -177,12 +177,23 @@ curl -X POST http://localhost:8080/schedule -H "Content-Type: application/json" 
 }'
 ```
 
-## 🛠 未來規劃
 
-- 加入實體硬體 API 整合
-- 任務 queue 改為 RabbitMQ / Redis
-- 優化排程算法（多目標 / 權重調整）
-- 支援多租戶 / 多 Region 排程
+## 🗂️ Virtflow-Scheduler Backlog
+
+| 狀態 | 類別 | 功能項目 | 說明 |
+|------|------|----------|------|
+| ⏳ 待開發 | K8s Upgrade 整合 | Spare Node Provisioning API | 新增 `/spare/prepare` 接口觸發備援 VM |
+| ⏳ 待開發 | Scheduler | prepare_spare() 核心邏輯 | 根據 BM 資源選擇部署點並回傳任務 |
+| ⏳ 待開發 | Pipeline 整合 | 觸發 Ansible / GitLab 建立 VM | 將任務轉換為 VM 建立流程 |
+| ⏳ 待開發 | Cluster 驗證 | Spare Node Ready 健康檢查 | 驗證 VM 是否成功加入 K8s 並 Ready |
+| ⏳ 待開發 | 通知系統 | Webhook 通知 UpgradeCtrl | 任務成功完成時 POST 通知對方系統 |
+| ⏳ 待開發 | 任務管理 | 任務狀態儲存與查詢 | 支援以 UUID 查任務狀態，並可記錄歷史 |
+| ⏳ 待開發 | 容錯機制 | Timeout / Retry 處理 | 任務卡住或失敗時自動重試或標記失敗 |
+| ⏳ 待開發 | 資源回收 | 升級完成釋放 spare node | 根據策略自動移除備援 VM |
+| ⏳ 待開發 | 安全性 | Webhook 認證（HMAC） | 避免偽冒通知，增加 webhook 簽名驗證 |
+| ⏳ 待開發 | 彈性通知 | 支援多 Webhook Receiver | 可設定多個 webhook endpoint |
+| ⏳ 待開發 | 發布機制 | 將 webhook 換為 Event Bus | 若擴大可轉 Kafka/NATS 等 async 發布 |
+
 
 ## 🤝 貢獻與參與
 
