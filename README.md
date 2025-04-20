@@ -180,6 +180,21 @@ curl -X POST http://localhost:8080/schedule -H "Content-Type: application/json" 
 
 ## 🗂️ Virtflow-Scheduler Backlog
 
+
+### 🐇 RabbitMQ Task Queue
+
+| 狀態 | 類別 | 功能項目 | 說明 |
+|------|------|----------|------|
+| ⏳ 待開發 | 任務佇列 | 整合 RabbitMQ 作為主任務佇列 | 使用 aio-pika 建立 connection、queue、consumer |
+| ⏳ 待開發 | 任務發送 | 替代 asyncio queue 的 enqueue 動作 | 發佈任務至指定 routing key 的 queue（如 `task.schedule`） |
+| ⏳ 待開發 | 任務接收 | 改寫 `worker.py` 為 RabbitMQ 消費者 | 負責從 queue 拿任務、執行、處理失敗與 retry |
+| ⏳ 待開發 | Queue 建立邏輯 | 在 app 啟動時自動建立 queue/exchange | 使用 durable queue + topic exchange |
+| ⏳ 待開發 | 任務狀態儲存 | 任務消費前/後狀態寫入 DB 或快取 | 支援查詢任務目前進度 |
+| ⏳ 待開發 | 失敗容錯 | 支援 retry 機制與 Dead Letter Queue | 可設定最大重試次數，失敗通知 admin/log |
+| ⏳ 待開發 | DevOps 支援 | 提供 RabbitMQ docker-compose 或 helm | 作為 local dev + K8s dev ready solution |
+
+### 🆙 Upgrade Integration 
+
 | 狀態 | 類別 | 功能項目 | 說明 |
 |------|------|----------|------|
 | ⏳ 待開發 | K8s Upgrade 整合 | Spare Node Provisioning API | 新增 `/spare/prepare` 接口觸發備援 VM |
