@@ -2,22 +2,30 @@ import aio_pika
 import asyncio
 import json
 import os
+from task_db import update_task_status
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
+
 
 async def handle_message(message: aio_pika.IncomingMessage):
     async with message.process():
         try:
             payload = json.loads(message.body)
             task_id = payload.get("task_id", "UNKNOWN")
-            node = payload.get("node", "NO_NODE")
+            requested_pool = payload.get("requested_pool", "NO_POOL")
 
-            print(f"🚀 接收到任務: {task_id}, 要處理 node: {node}")
-            await asyncio.sleep(2)
-            print(f"✅ 任務完成: {task_id}")
+            update_task_status(task_id, "running")
+
+            print(f"[Worker] Task Received: {task_id}, Request Pool: {requested_pool}")
+            await asyncio.sleep(10)
+
+            update_task_status(task_id, "success")
+            print(f"[Worker] Task Success: {task_id}")
 
         except Exception as e:
-            print(f"❌ 任務失敗: {e}")
+            print(f"[Worker] Task Failed: {e}")
+            update_task_status(task_id, "failed")
+
 
 async def main():
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
@@ -27,10 +35,11 @@ async def main():
     queue = await channel.declare_queue("task.schedule", durable=True)
     await queue.consume(handle_message, no_ack=False)
 
-    print("🟢 Worker 已啟動，等待任務中...")
+    print("[Worker] Worker Activated, Waiting for task...")
 
-    # 👇 保持不退出
-    await asyncio.Future()  # 不會完成，保持一直跑
+    # Keep processing
+    await asyncio.Future()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
