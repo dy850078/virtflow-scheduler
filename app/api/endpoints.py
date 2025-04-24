@@ -1,8 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.core.rmq_producer import publish_task
-from app.models.schemas import BareMetalNode, SchedulingRequest
-from app.services import scheduler
-from app.core import worker
+from app.models.schemas import SchedulingRequest
 from app.core.task_db import get_task_status
 
 router = APIRouter()

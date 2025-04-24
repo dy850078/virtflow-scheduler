@@ -26,7 +26,6 @@ async def handle_message(message: aio_pika.IncomingMessage):
 
             request = SchedulingRequest(**payload)
             nodes = await fetch_bare_metal_nodes()
-            logger.info(f"[Available] {[nodes]}")
             selected_node = run_scheduler(nodes, request)
             
             if selected_node:

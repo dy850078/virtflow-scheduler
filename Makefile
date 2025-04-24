@@ -1,4 +1,3 @@
-# 建置並啟動 RabbitMQ
 rabbitmq-up:
 	docker run -d --hostname rabbitmq \
 		--name rabbitmq \
@@ -8,10 +7,11 @@ rabbitmq-up:
 		-e RABBITMQ_DEFAULT_PASS=guest \
 		rabbitmq:3-management
 
-# 停止並刪除 RabbitMQ
 rabbitmq-down:
 	docker stop rabbitmq && docker rm rabbitmq
 
+worker-up:
+	python3 -m app.core.rmq_worker
 
 node-up:
 	uvicorn app.api.node-endpoints:app --host 0.0.0.0 --port 5000 --reload
