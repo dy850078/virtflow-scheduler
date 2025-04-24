@@ -210,78 +210,76 @@ curl -X POST http://localhost:8080/schedule -H "Content-Type: application/json" 
 | ⏳ 待開發 | 發布機制 | 將 webhook 換為 Event Bus | 若擴大可轉 Kafka/NATS 等 async 發布 |
 
 ## 部屬策略
+### 🟢 方案 1：Seed Cluster + Workload Clusters 分離（推薦）
+#### 架構概念：
+預先手動部署一組 Seed Cluster（建議 3~5 台 Baremetal VM）。
 
-### 🟢 方案 1：Seed Cluster + Workload Clusters 分離（推薦方案）
-#### 🔥 架構概念：
-用 3~5 台 BM 先起一組 Seed Cluster（K8s），這個 Cluster 永遠是 scheduler 與 provision 系統的居住地。
-Workload Clusters 都由這個 Seed Cluster 透過 virtflow-scheduler 動態生成。
-Seed Cluster 自己不參與被調度（exclude 自己）。
+virtflow-scheduler / RabbitMQ / Inventory / PXE / VM Provisioner 均部署在這組 Seed Cluster。
 
-#### 📌 優點：
+這組 Seed Cluster 專門負責其他 Workload Cluster 的 VM 選擇與生成，不參與被調度。
 
-項目	說明
-穩定性	高。因為 scheduler 自己不會影響自己，cluster control plane 與 workload 分開。
-擴展性	好。Seed Cluster 穩定存在，能支援多個 workload clusters，cluster 數量和規模皆可彈性增長。
-維運成本	適中。一開始手動起 Seed Cluster，但之後不用一直碰，focus 在 scheduler 與 provision 開發。
-開發成本	低。Scheduler logic 開發單純，無需考慮自身重啟影響（no recursive scheduling problem）。
-資源利用率	稍低於理想（因為 Seed Cluster 是 reserved，不參與其他 cluster VM host）。
-故障隔離	佳。Workload clusters 出問題不影響 scheduler，只有 Seed Cluster 本身出問題時影響 scheduler。
-彈性復原	容易。如果 Seed Cluster 壞了，可以用 PXE + Ansible 快速重建（因為是固定 inventory）。
-#### 🚩 缺點：
-必須預留一些 BM，只給 Seed Cluster 使用（但這其實是 trade-off for stability）。
+#### 優點：
+- 穩定性高（不怕自斷生路）
 
-初始建置時需花一點時間部署這個 Seed Cluster，但這是一勞永逸。
+- 多Cluster擴展容易（multi-cluster friendly）
 
-## 🟡 方案 2：Non-K8s 外部服務部署（RabbitMQ + SQLite + virtflow-scheduler on baremetal/docker-compose）
-### 🔥 架構概念：
-virtflow-scheduler 跟 RabbitMQ 不跑在 K8s，而是跑在 Docker (Compose / systemd) 直接在 BM or VM 上。
+- 故障隔離佳
 
-用這套非 K8s 管理的系統去起 Workload Cluster。
+- 重建 Seed Cluster 相對容易（PXE + Ansible）
 
-#### 📌 優點：
+#### 缺點：
+- 需要預留一些 Baremetal，專門給 Seed Cluster 使用
 
-項目	說明
-穩定性	高。scheduler 本體跟 K8s 無關，不怕自己的 scheduling 影響自身運作。
-維運成本	低初期（不用先建一個 k8s），但非 K8s 系統長期維運不如 K8s native 管理方便。
-開發成本	略高（需要自己維護非 k8s 的 deployment / health-check / HA）。
-資源利用率	高（BM 不需要 reserve 給 Seed Cluster，全部可動態調度）。
-擴展性	一般（非 K8s native，擴展到多站點或多 scheduler 需要自行實作 HA / Leader Election）。
-故障隔離	好。scheduler crash 不會影響任何 cluster（反之亦然），但自身 HA 需手動處理（如 keepalived）。
-彈性復原	普通。因為非 k8s，沒有 built-in operator / deployment 來自動復原，需要自己實作 systemd / health-check 重啟。
-#### 🚩 缺點：
-跟你目前 K8s infra 維運習慣脫節（你需要維護一個非 K8s 的架構）。
+- 初始建置 Seed Cluster 需要一點人力
 
-長遠來看，當系統規模變大，會想回頭變成 k8s native。
+### 🟡 方案 2：Non-K8s 外部服務部署
+#### 架構概念：
+virtflow-scheduler + RabbitMQ + SQLite 不跑在 Kubernetes，而是部署在 Docker / systemd 的 VM 或 Baremetal 上。
 
-## 🔵 方案 3：共生（第一組 Cluster 同時承載 scheduler）
-### 🔥 架構概念：
-最小化手動建置一組 K8s Cluster，scheduler 就住在這裡。
+用來管理其他 K8s Cluster 的 VM 建置。
 
-這組 cluster 同時也是 VM hosting 的 target（但是 scheduler 邏輯 exclude 自己）。
+#### 優點：
+- 不需要預先有 Kubernetes Cluster
+- Bootstrap 最直接，快速啟動
 
-#### 📌 優點：
+- Scheduler 完全不受自身調度邏輯影響
 
-項目	說明
-開發成本	最低（scheduler 跟 workload cluster 是同一個平台，無需多餘維運其他系統）。
-資源利用率	高（因為 scheduler 跟 workload 共用一組 BM）。
-初期部署簡單	快速部署，無需多一套 Seed Cluster。
-#### 🚩 缺點（這是最大痛點）：
+#### 缺點：
+- 與 K8s native 工具脫節（維運上無法用 Deployment / StatefulSet 等標準資源）
 
-項目	說明
-穩定性	低（如果 scheduler 不小心排自己 cluster 上的 BM 出去，可能自斷生路）。
-維運成本	高（每次調度邏輯變動都要小心不要破壞自己）。
-擴展性	中（scale-out 時需要考慮 master-node resource 是否足夠，否則會干擾 scheduler 運作）。
-彈性復原	普通。除非你額外做 HA Scheduler Deployment，否則 scheduler 掛了就影響整個 provisioning。
-📊 總結比較表：
+- HA 機制需自行實作（如 keepalived, corosync/pacemaker）
 
-指標	Seed Cluster 分離（方案1）	Non-K8s 外部服務（方案2）	共生（方案3）
-穩定性	⭐⭐⭐⭐☆	⭐⭐⭐⭐☆	⭐⭐☆☆☆
-擴展性	⭐⭐⭐⭐☆	⭐⭐⭐☆☆	⭐⭐⭐☆☆
-維運成本	⭐⭐⭐☆☆	⭐⭐☆☆☆	⭐⭐⭐☆☆
-開發成本	⭐⭐⭐☆☆	⭐⭐☆☆☆	⭐⭐⭐⭐☆
-資源利用率	⭐⭐⭐☆☆	⭐⭐⭐⭐☆	⭐⭐⭐⭐☆
-故障隔離	⭐⭐⭐⭐☆	⭐⭐⭐⭐☆	⭐⭐☆☆☆
-彈性復原	⭐⭐⭐⭐☆	⭐⭐☆☆☆	⭐⭐☆☆☆
+- 當規模變大時可能回頭想轉回 K8s native
+
+### 🔵 方案 3：共生（第一組 Cluster 同時承載 Scheduler）
+#### 架構概念：
+建立一個最小化的 K8s Cluster（手動或自動 PXE + Ansible）。
+
+virtflow-scheduler 跟 workload cluster 同居一個 cluster，透過排程邏輯排除自己。
+
+#### 優點：
+- 開發成本最低（部署與運行平台一致）
+
+- 不需要額外維護 Seed Cluster
+
+- 資源利用率高（不用預留 BM）
+
+#### 缺點：
+- 容易踩到自己（排錯難度高）
+
+- Scheduler 一旦出錯有可能影響自己的 cluster hosting
+
+- 擴展到多 cluster 時不夠靈活
+
+Criteria | Seed Cluster Separation (Option 1) | Non-K8s External Service (Option 2) | Co-located Scheduler (Option 3)
+|------|---------|---------|---------|
+Stability | ⭐⭐⭐⭐☆ (High, control plane isolated) | ⭐⭐⭐⭐☆ (High, independent from K8s scheduling) | ⭐⭐☆☆☆ (Low, risk of self-impact if scheduler selects itself)
+Scalability | ⭐⭐⭐⭐☆ (Supports multi-cluster expansion easily) | ⭐⭐⭐☆☆ (Manual HA and scaling needed) | ⭐⭐⭐☆☆ (Moderate, scale depends on master resource)
+Operation Cost | ⭐⭐⭐☆☆ (Moderate, need to maintain Seed Cluster) | ⭐⭐☆☆☆ (Lower, but harder to maintain long-term) | ⭐⭐⭐☆☆ (Need careful logic for self-exclusion)
+Development Cost | ⭐⭐⭐☆☆ (Simple, no self-scheduling issues) | ⭐⭐☆☆☆ (Slightly higher, maintain your own HA logic) | ⭐⭐⭐⭐☆ (Lowest, everything on one cluster)
+Resource Utilization | ⭐⭐⭐☆☆ (Some BM reserved for Seed Cluster) | ⭐⭐⭐⭐☆ (No reservation needed, full BM utilization) | ⭐⭐⭐⭐☆ (Shared BM, high utilization)
+Fault Isolation | ⭐⭐⭐⭐☆ (Workload issues don't affect scheduler) | ⭐⭐⭐⭐☆ (Good, but HA must be handled manually) | ⭐⭐☆☆☆ (Low, potential self-scheduling failure)
+Resilience / Recovery | ⭐⭐⭐⭐☆ (Easy to rebuild Seed Cluster if needed) | ⭐⭐☆☆☆ (Manual recovery process required) | ⭐⭐☆☆☆ (HA and recovery complex, self-risk)
 
 
 ## 🤝 貢獻與參與
