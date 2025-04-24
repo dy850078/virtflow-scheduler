@@ -13,10 +13,11 @@ def init_db():
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS task_status (
-            task_id TEXTㄋPRIMARY KEY,
+            task_id TEXT PRIMARY KEY,
             status TEXT NOT NULL,
             timestamp TEXT NOT NULL,
-            error TEXT
+            error TEXT,
+            selected_node TEXT
         )
     """)
     conn.commit()
@@ -32,14 +33,14 @@ def create_task(task_id: str):
     conn.commit()
     conn.close()
 
-def update_task_status(task_id: str, status: str, error: str = None):
+def update_task_status(task_id: str, status: str, error: str = None, selected_node: str = None):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
-        UPDATE task_status
-        SET status = ?, timestamp = ?, error = ?
-        WHERE task_id = ?
-    """, (status, datetime.utcnow().isoformat(), error, task_id))
+    UPDATE task_status
+    SET status = ?, timestamp = ?, error = ?, selected_node = ?
+    WHERE task_id = ?
+""", (status, datetime.utcnow().isoformat(), error, selected_node, task_id))
     conn.commit()
     conn.close()
 

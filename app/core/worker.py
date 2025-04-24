@@ -2,6 +2,7 @@ import asyncio
 import random
 from fastapi import HTTPException
 from contextlib import asynccontextmanager
+from app.core.task_db import init_db
 from app.models.schemas import SchedulingRequest
 from app.services.node import get_nodes, cache_updater
 from app.services.algorithm import select_best_node
@@ -12,11 +13,12 @@ task_status = {}
 
 @asynccontextmanager
 async def lifespan(app):
-    cache_task = asyncio.create_task(cache_updater())
-    scheduler_task = asyncio.create_task(scheduler_worker())
+    # cache_task = asyncio.create_task(cache_updater())
+    # scheduler_task = asyncio.create_task(scheduler_worker())
+    init_db()
     yield
-    cache_task.cancel()
-    scheduler_task.cancel()
+    # cache_task.cancel()
+    # scheduler_task.cancel()
 
 async def scheduler_worker():
     while True:
@@ -30,6 +32,7 @@ async def scheduler_worker():
 
 async def process_schedule_request(task_id: str, request: SchedulingRequest, retry_count: int):
     task_status[task_id] = {"status": "processing"}
+    print("legacy worker")
     nodes = await get_nodes()
 
     if not nodes:
